@@ -6,3 +6,6 @@
 ### MCU_Module
 BL618
 > 因为支持Wifi6, 刚好又白嫖一块开发板
+
+### SDK_VERSION
+bouffalo_sdk Release V2.0
