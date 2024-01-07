@@ -39,13 +39,9 @@ void draw_task(void *parameter)
     u8g2_t __oled;
     u8g2_t *oled = &__oled;
 
-    printf("addr comp: %x -- %x\r\n", oled, &(oled->u8x8));
-
     // u8g2_Setup_ssd1306_i2c_128x64_noname_f(oled, U8G2_R0, bl618_u8x8_byte_hw_i2c_cb, bl618_u8x8_gpio_and_delay);
     u8g2_Setup_ssd1306_i2c_128x32_univision_f(oled, U8G2_R1, get_u8g2_hw_i2c_cb(oled, 0x78, NULL), get_u8g2_gpio_and_delay(oled));
 
-    printf("stack remain: %d  [start]\r\n", uxTaskGetStackHighWaterMark(draw_task_handle));
-    printf("addr of u8g2: %x\r\n", oled);
 
     u8g2_InitDisplay(oled);
     u8g2_SetPowerSave(oled, 0);
@@ -136,8 +132,6 @@ int main(void)
                 &wifi_status,
                 7,
                 &draw_task_handle);
-
-    printf("func addr: %x\r\n", wifi_start_firmware_task);
 
     // wifi_start_firmware_task();
 
