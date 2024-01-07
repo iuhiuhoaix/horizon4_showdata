@@ -1,13 +1,3 @@
-/**
- * @file main.c
- * @author your name (you@domain.com)
- * @brief
- * @version 0.1
- * @date 2023-08-22
- *
- * @copyright Copyright (c) 2023
- *
- */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -30,48 +20,67 @@
 
 #include "bl618_u8g2.h"
 
+#include "wifi_event.h"
+
 // #define BL618
+
+#define SSID "鸡你太美1"
+#define PASS "jiushijiugejiu"
 
 #define DBG_TAG "MAIN"
 
 struct bflb_device_s *gpio;
 
-u8g2_t __oled;
-u8g2_t *oled = &__oled;
+uint32_t wifi_status = 0;
 
 TaskHandle_t draw_task_handle;
 void draw_task(void *parameter)
 {
+    u8g2_t __oled;
+    u8g2_t *oled = &__oled;
+
+    printf("addr comp: %x -- %x\r\n", oled, &(oled->u8x8));
+
+    // u8g2_Setup_ssd1306_i2c_128x64_noname_f(oled, U8G2_R0, bl618_u8x8_byte_hw_i2c_cb, bl618_u8x8_gpio_and_delay);
+    u8g2_Setup_ssd1306_i2c_128x32_univision_f(oled, U8G2_R1, get_u8g2_hw_i2c_cb(oled, 0x78, NULL), get_u8g2_gpio_and_delay(oled));
+
+    printf("stack remain: %d  [start]\r\n", uxTaskGetStackHighWaterMark(draw_task_handle));
+    printf("addr of u8g2: %x\r\n", oled);
+
     u8g2_InitDisplay(oled);
     u8g2_SetPowerSave(oled, 0);
     u8g2_SetContrast(oled, 100);
 
+
     int fps = 0;
-    char *fps_str;
+    char fps_str[10] = {0};
+    char wifi_status_str[10] = {0};
 
     uint64_t start_time = 0;
     u8g2_SetFont(oled, u8g2_font_wqy12_t_chinese3);
-    while (true)
+    while (bl618_u8x8_get_i2c_error_code(oled) >= 0)
     {
+
         start_time = bflb_mtimer_get_time_us();
-        fps_str = itoa(fps++, fps_str, 10);
-        printf("[str]%s\r\n", fps_str);
-        // u8g2_FirstPage(oled);
-        // do
-        // {
-        //     u8g2_DrawUTF8(oled, 0, 15, fps_str);
-        // } while (u8g2_NextPage(oled));    
-
-        u8g2_ClearBuffer(oled);
-
-        u8g2_SetFont(oled, u8g2_font_wqy12_t_chinese3);
+        itoa(fps++, fps_str, 10);
+        itoa(*(uint32_t *)parameter, wifi_status_str, 10);
+        u8g2_FirstPage(oled);
+        do
         {
-            u8g2_DrawUTF8(oled, 0, 1 * 16 - 1, fps_str);
-        }
-        printf("before send\r\n");
-        u8g2_SendBuffer(oled);
-        printf("after send\r\n");
+            u8g2_DrawUTF8(oled, 0, 15, fps_str);
+            u8g2_DrawUTF8(oled, 0, 31, wifi_status_str);
+        } while (u8g2_NextPage(oled));
 
+        // u8g2_ClearBuffer(oled);
+
+        // u8g2_SetFont(oled, u8g2_font_wqy12_t_chinese3);
+        // {
+        //     u8g2_DrawUTF8(oled, 0, 1 * 16 - 1, fps_str);
+        //     u8g2_DrawUTF8(oled, 0, 2 * 16 - 1, wifi_status_str);
+        // }
+        // u8g2_SendBuffer(oled);
+
+        // printf("stack remain: %d  [in cycle]\r\n", uxTaskGetStackHighWaterMark(draw_task_handle));
         // bflb_mtimer_delay_us(33333 - (bflb_mtimer_get_time_us() - start_time));
         // vTaskDelay((33333 - (bflb_mtimer_get_time_us() - start_time)) / (portTICK_PERIOD_MS / 1000));
         vTaskDelay((33333 - (bflb_mtimer_get_time_us() - start_time)) / 1000 / portTICK_PERIOD_MS);
@@ -81,8 +90,22 @@ void draw_task(void *parameter)
 TaskHandle_t wifi_task_handle;
 void wifi_task(void *parameter)
 {
+    vTaskDelay(1000 / portTICK_PERIOD_MS);
+
+    *(uint32_t *)parameter = wifi_connect(SSID, PASS);
+    printf("wifi status: %d\r\n", *(uint32_t *)parameter);
+
     while (true)
     {
+        if (NULL != draw_task_handle)
+        {
+            eTaskState draw_state = eTaskGetState(draw_task_handle);
+            if (draw_state == eBlocked)
+            {
+                vTaskResume(draw_task_handle);
+            }
+            printf("task statue: %d\r\n", draw_state);
+        }
         printf("beacon\r\n");
         vTaskDelay(2000 / portTICK_PERIOD_MS);
     }
@@ -98,8 +121,6 @@ void gpio_init()
     bflb_gpio_reset(gpio, GPIO_PIN_29);
 }
 
-
-
 int main(void)
 {
     board_init();
@@ -109,41 +130,30 @@ int main(void)
     // uart_init();
     gpio_init();
 
-
-    u8g2_Setup_ssd1306_i2c_128x64_noname_f(oled, U8G2_R0, csrc_u8x8_byte_hw_i2c, csrc_u8x8_gpio_and_delay);
-
-
     xTaskCreate(draw_task,
                 "draw_task",
-                256,
-                NULL,
+                2048,
+                &wifi_status,
                 7,
-                draw_task_handle);
+                &draw_task_handle);
+
+    printf("func addr: %x\r\n", wifi_start_firmware_task);
+
+    // wifi_start_firmware_task();
 
     xTaskCreate(wifi_task,
                 "wifi_task",
-                256,
-                NULL,
+                2048,
+                &wifi_status,
                 7,
                 wifi_task_handle);
 
     vTaskStartScheduler();
 
-    // while (1)
-    // {
-    //     u8g2_ClearBuffer(oled);
-
-    //     u8g2_SetFont(oled, u8g2_font_wqy12_t_chinese3);
-    //     for (int i = 1; i <= 4; i++)
-    //     {
-    //         u8g2_DrawUTF8(oled, 0, i * 16 - 1, "安信可");
-    //     }
-    //     u8g2_SendBuffer(oled);
-    // }
+    printf("end scheduler\r\n");
 
     while (true)
     {
-        printf("beacon\r\n");
         bflb_mtimer_delay_ms(10000);
     }
 

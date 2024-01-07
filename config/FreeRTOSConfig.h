@@ -105,6 +105,9 @@ to exclude the API function. */
 #define INCLUDE_xTaskGetHandle           1
 #define INCLUDE_xSemaphoreGetMutexHolder 1
 
+// add funciton by xhh
+#define INCLUDE_uxTaskGetStackHighWaterMark 1
+
 /* Normal assert() semantics without relying on the provision of an assert.h
 header file. */
 void vApplicationMallocFailedHook(void);
